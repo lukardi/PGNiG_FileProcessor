@@ -1,25 +1,50 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.ServiceProcess;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace PGNiG_FileProcessor
 {
     static class Program
     {
+
         /// <summary>
-        /// The main entry point for the application.
+        /// Główny punkt wejścia dla aplikacji.
         /// </summary>
-        static void Main()
+        static void Main(string[] args)
         {
-            ServiceBase[] ServicesToRun;
-            ServicesToRun = new ServiceBase[]
+            if (Environment.UserInteractive)
+            {
+                RunTestService(args);
+                Console.WriteLine("Press any key to stop...");
+                Console.ReadKey();
+            }
+            else
+            {
+                RunService(args);
+            }
+        }
+
+        /// <summary>
+        /// Uruchamia usługę systemową.
+        /// </summary>
+        /// <param name="args"></param>
+        static void RunService(string[] args)
+        {
+
+            ServiceBase[] service = new ServiceBase[]
             {
                 new FileProcessor()
             };
-            ServiceBase.Run(ServicesToRun);
+            ServiceBase.Run(service);
+        }
+
+        /// <summary>
+        /// Uruchamia usługę systemową w konsoli.
+        /// </summary>
+        /// <param name="args"></param>
+        static void RunTestService(string[] args)
+        {
+            FileProcessor service = new FileProcessor();
+            service.OnStartTest(args);
         }
     }
 }

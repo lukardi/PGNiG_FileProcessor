@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Configuration;
@@ -12,19 +10,39 @@ namespace PGNiG_FileProcessor
     class LibreOfficeConverter
     {
         private static readonly string appPath = AppDomain.CurrentDomain.BaseDirectory;
-        //private static readonly string exePath = Properties.Settings.Default.LibreOfficePath + @"\program\soffice.exe";
         private static readonly string exePath = ConfigurationManager.AppSettings.Get("LibreOfficePath") + @"\program\soffice.exe";
-        // private static readonly string userData = appPath + @"UserData";
         private static readonly string userData = ConfigurationManager.AppSettings.Get("UserDataFolder");
+        public static readonly bool headless = ConfigurationManager.AppSettings.Get("LibreOfficePathHeadlessMode") == "true";
+        private static readonly int timeout = 60 * 1000;
 
-        public static void Run(string inputPath, string outputPath)
+        /// <summary>
+        /// Runs as background task.
+        /// </summary>
+        /// <param name="inputPath"></param>
+        /// <param name="outputPath"></param>
+        /// <returns></returns>
+        public static Task RunAsync(string inputPath, string outputPath)
+        {
+            return Task.Run(() =>
+            {
+                Run(inputPath, outputPath);
+            });
+        }
+
+        /// <summary>
+        /// Converts a file using LibreOffice.
+        /// </summary>
+        /// <param name="inputPath"></param>
+        /// <param name="outputPath"></param>
+        /// <returns>Exec Exit code.</returns>
+        public static int Run(string inputPath, string outputPath)
         {
             CheckUserData();
             if (!Directory.Exists(outputPath))
             {
                 Directory.CreateDirectory(outputPath);
             }
-            Process(inputPath, outputPath);
+            return Process(inputPath, outputPath);
         }
 
         public static void CheckUserData()
@@ -40,7 +58,7 @@ namespace PGNiG_FileProcessor
             File.Copy(appPath + @"Macro\Module1.xba", userData + @"\user\basic\Standard\Module1.xba", true);
         }
 
-        public static void Process(string inputPath, string outputPath)
+        public static int Process(string inputPath, string outputPath)
         {
             if (!Directory.Exists(inputPath))
             {
@@ -64,7 +82,7 @@ namespace PGNiG_FileProcessor
                 "\"macro:///Standard.Module1.FitToPage\"",
             });
             //Run conversion
-            Exec(new List<string> {
+            return Exec(new List<string> {
                 "--convert-to pdf",
                 $"--outdir \"{outputPath}\"",
                 $"\"{inputPath}\""
@@ -75,18 +93,28 @@ namespace PGNiG_FileProcessor
         {
             var process = new Process();
             process.StartInfo.FileName = exePath;
-            args.Add("--headless");
+            if (headless)
+            {
+                args.Add("--headless");
+            }
             args.Add("--norestore");
             args.Add("--nofirststartwizard");
             var userDataDir = $"file:///{userData.Replace(@"\", @"/")}";
             args.Add($"-env:UserInstallation=\"{userDataDir}\"");
             process.StartInfo.Arguments = string.Join(" ", args);
-            process.StartInfo.UseShellExecute = true;
-            process.StartInfo.CreateNoWindow = true;
+            process.StartInfo.UseShellExecute = headless;
+            process.StartInfo.CreateNoWindow = headless;
             process.Start();
-            if (!process.WaitForExit(60 * 1000))
+            if (!process.WaitForExit(timeout) && !process.HasExited)
             {
-                process.Kill();
+                if (headless)
+                {
+                    process.Kill();
+                }
+                else
+                {
+                    process.WaitForExit();
+                }
             }
             return process.ExitCode;
         }
