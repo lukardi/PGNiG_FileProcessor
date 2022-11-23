@@ -1,0 +1,117 @@
+﻿Instalowanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Nie można znaleźć instalatorów publicznych z atrybutem RunInstallerAttribute.Yes w zestawie C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe.
+Zatwierdzanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Nie można znaleźć instalatorów publicznych z atrybutem RunInstallerAttribute.Yes w zestawie C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe.
+Usuwanie pliku InstallState z powodu braku instalatorów.
+Instalowanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Trwa instalowanie usługi FileProcessor...
+Usługa FileProcessor została zainstalowana pomyślnie.
+Trwa tworzenie źródła EventLog FileProcessor w dzienniku Application...
+Zatwierdzanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Instalowanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Trwa instalowanie usługi FileProcessor...
+Usługa FileProcessor została zainstalowana pomyślnie.
+Trwa tworzenie źródła EventLog FileProcessor w dzienniku Application...
+Zatwierdzanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Odinstalowywanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Usuwanie źródła EventLog FileProcessor.
+Trwa usuwanie usługi FileProcessor z systemu...
+Usługa FileProcessor została pomyślnie usunięta z systemu.
+Instalowanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Wycofywanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Instalowanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Trwa instalowanie usługi FileProcessor...
+Trwa tworzenie źródła EventLog FileProcessor w dzienniku Application...
+Wycofywanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Przywracanie dziennika zdarzeń do poprzedniego stanu dla źródła FileProcessor.
+Instalowanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Trwa instalowanie usługi FileProcessor...
+Usługa FileProcessor została zainstalowana pomyślnie.
+Trwa tworzenie źródła EventLog FileProcessor w dzienniku Application...
+Zatwierdzanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Instalowanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Trwa instalowanie usługi FileProcessor...
+Trwa tworzenie źródła EventLog FileProcessor w dzienniku Application...
+Wycofywanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Przywracanie dziennika zdarzeń do poprzedniego stanu dla źródła FileProcessor.
+Odinstalowywanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Usuwanie źródła EventLog FileProcessor.
+Trwa usuwanie usługi FileProcessor z systemu...
+Usługa FileProcessor została pomyślnie usunięta z systemu.
+Instalowanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe
+Trwa instalowanie usługi FileProcessor...
+Usługa FileProcessor została zainstalowana pomyślnie.
+Trwa tworzenie źródła EventLog FileProcessor w dzienniku Application...
+Zatwierdzanie zestawu 'C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe'.
+Uwzględnione parametry to:
+   logtoconsole = 
+   logfile = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.InstallLog
+   assemblypath = C:\Users\bg\Documents\Visual Studio 2015\Projects\PGNiG_FileProcessor\PGNiG_FileProcessor\bin\Debug\PGNiG_FileProcessor.exe

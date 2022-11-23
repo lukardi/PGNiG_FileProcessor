@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Module1" script:language="StarBasic">
+	REM  *****  BASIC  *****
+
+	Sub FitToPage
+		Dim document As Object, pageStyles As Object
+		document   = ThisComponent
+		On Error GoTo ErrorHandler
+			pageStyles = document.StyleFamilies.getByName(&quot;PageStyles&quot;)
+			For i = 0 To document.Sheets.Count - 1
+				Dim sheet As Object, style As Object
+				sheet = document.Sheets(i)
+				style = pageStyles.getByName(sheet.PageStyle)
+				style.ScaleToPagesX = 1
+			Next
+			On Error Resume Next
+			document.storeSelf(Array())
+			document.close(true)
+		Exit Sub
+		ErrorHandler:
+			If Not IsEmpty(document) Then
+				document.close(true)
+			End If
+	End Sub
+
+	Sub Main
+
+	End Sub
+</script:module>
