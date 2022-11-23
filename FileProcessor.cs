@@ -18,14 +18,16 @@ namespace PGNiG_FileProcessor
             InitializeComponent();
         }
 
+        public void OnStartTest(string[] args)
+        {
+            OnStart(args);
+        }
+
         protected override void OnStart(string[] args)
         {
-           // CheckFolders();
-
             Timer timer = new Timer();
-            //timer.Interval = 120000; // 120 seconds
             timer.Interval = 30000; // 120 seconds
-            timer.Elapsed += new ElapsedEventHandler(this.OnTimer);
+            timer.Elapsed += new ElapsedEventHandler(OnTimer);
             timer.Start();
         }
 
@@ -33,14 +35,14 @@ namespace PGNiG_FileProcessor
         {
             FileGatherer.CollectNetworkFiles();
             FileGatherer.DownloadMessages();
-           
+
         }
 
         protected override void OnStop()
         {
-            
+
         }
 
-      
+
     }
 }
