@@ -122,13 +122,17 @@ namespace PGNiG_FileProcessor
 
             string[] array = Directory.GetFiles(path, "*.msg");
             MsgReader.Outlook.Storage.Message messagefile = new Storage.Message(array[0], FileAccess.ReadWrite);
-            string date = messagefile.Headers.DateSent.ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
+            string date = messagefile.Headers.DateSent.ToLocalTime().ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
+            
 
             CreateMailBodyPDFFile(messagefile.BodyText, path);
             //CreateSignalFile(path);
             messagefile.Dispose();
-
+            //delete .msg file
+            File.Delete(array[0]);
             MoveFolderForClassification(path, InputClassificationFolder, date);
+            ////delete temp folder
+            Directory.Delete(path,true);
 
         }
 
