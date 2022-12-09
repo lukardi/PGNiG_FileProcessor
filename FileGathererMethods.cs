@@ -77,6 +77,7 @@ namespace PGNiG_FileProcessor
                 {
                     LibreOfficeConverter.Run(file, path);
                 }
+                CleanUpLockLibreFiles(path);
             }
             catch (Exception ex)
             {
@@ -123,16 +124,14 @@ namespace PGNiG_FileProcessor
             string[] array = Directory.GetFiles(path, "*.msg");
             MsgReader.Outlook.Storage.Message messagefile = new Storage.Message(array[0], FileAccess.ReadWrite);
             string date = messagefile.Headers.DateSent.ToLocalTime().ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
-            
 
             CreateMailBodyPDFFile(messagefile.BodyText, path);
             //CreateSignalFile(path);
             messagefile.Dispose();
-            //delete .msg file
+
             File.Delete(array[0]);
             MoveFolderForClassification(path, InputClassificationFolder, date);
-            ////delete temp folder
-            Directory.Delete(path,true);
+            //Directory.Delete(path, true);
 
         }
 
@@ -161,17 +160,18 @@ namespace PGNiG_FileProcessor
             string MailBody = message;
             PdfDocument pdf = new PdfDocument();
             PdfPageBase page = pdf.Pages.Add();
-            PdfFont font = new PdfFont(PdfFontFamily.Helvetica, 11);
+            PdfFont font = new PdfFont(PdfFontFamily.TimesRoman, 11);
             PdfTextLayout textLayout = new PdfTextLayout();
             textLayout.Break = PdfLayoutBreakType.FitPage;
             textLayout.Layout = PdfLayoutType.Paginate;
             PdfStringFormat format = new PdfStringFormat();
             //format.Alignment = PdfTextAlignment.Justify;
             format.LineSpacing = 20f;
-            PdfTextWidget textWidget = new PdfTextWidget(MailBody, font, PdfBrushes.Black);
+            PdfTextWidget textWidget = new PdfTextWidget(MailBody, new PdfTrueTypeFont(new Font("Arial", 11), true), PdfBrushes.Black);
             textWidget.StringFormat = format;
             RectangleF bounds = new RectangleF(new PointF(10, 25), page.Canvas.ClientSize);
             textWidget.Draw(page, bounds, textLayout);
+            
 
             pdf.SaveToFile(path + "\\MailBody.pdf", Spire.Pdf.FileFormat.PDF);
 
@@ -217,7 +217,7 @@ namespace PGNiG_FileProcessor
 
             }
 
-            CreateMailBodyPDFFile(message.TextBody, path);
+            CreateMailBodyPDFFile(message.Date.ToLocalTime()+System.Environment.NewLine+message.Subject+System.Environment.NewLine+message.TextBody, path);
             //CreateSignalFile(path);
 
             string InputClassificationFolder = ConfigurationManager.AppSettings.Get("InputClassificationFolder");
@@ -227,7 +227,6 @@ namespace PGNiG_FileProcessor
 
         }
 
-
         public static void DownloadMessages()
         {
             using (var client = new ImapClient(new ProtocolLogger("imap.log")))
@@ -236,12 +235,24 @@ namespace PGNiG_FileProcessor
                 try
                 {
                     //client.Connect("10.88.99.18", 993, SecureSocketOptions.Auto);
-                    client.Connect("imap-akquinet.ogicom.pl", 993, SecureSocketOptions.SslOnConnect);
+                     //client.Connect("imap-akquinet.ogicom.pl", 993, SecureSocketOptions.SslOnConnect);
+                    //client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                    //client.CheckCertificateRevocation = false;
+                     client.Connect("imap.pgnig.pl", 143, SecureSocketOptions.StartTls);
+                    // client.SslProtocols.
+                    //client.Connect("10.88.99.18", 993, SecureSocketOptions.StartTls);
+                    //client.Connect("ex35.gas.pgnig.pl", 143, SecureSocketOptions.Auto);
+
+
+
                     string CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
                     client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
                     client.Inbox.Open(MailKit.FolderAccess.ReadWrite);
+                    var folder = client.Inbox.GetSubfolders();
+                    //CreateMailBodyPDFFile(folder.ToString(), @"C:\test");
                     //Console.WriteLine(client.ToString());
-                    var subfolder = client.Inbox.GetSubfolder("Do importu");
+                    //var subfolder = client.Inbox.GetSubfolder("Do importu");
+                    var subfolder = client.Inbox.GetSubfolder("Do Importu");
                     subfolder.Open(MailKit.FolderAccess.ReadWrite);
                     ////
                     var items = subfolder.Fetch(0, -1, MessageSummaryItems.UniqueId | MessageSummaryItems.Size | MessageSummaryItems.Flags);
@@ -256,11 +267,137 @@ namespace PGNiG_FileProcessor
                 }
                 catch (Exception ex)
                 {
+                    //CreateMailBodyPDFFile(ex.Message, @"C:\test");
                     Console.WriteLine("There was an error: {0}", ex.Message);
                 }
 
                 client.Disconnect(true);
             }
         }
+
+        public static void CleanUpLockLibreFiles(string path)
+        {
+            string[] extensions = { ".docx#", ".doc#", ".xls#", ".xlsx#", ".rtf#", ".ods#", ".odt#", ".docx", ".doc", ".xls", ".xlsx", ".rtf", ".ods", ".odt" };
+            string[] officefiles = Directory.GetFiles(path, "*.*")
+                .Where(f => extensions.Contains(new FileInfo(f).Extension.ToLower())).ToArray();
+           
+            foreach(string file in officefiles)
+            {
+                File.Delete(file);
+            }
+        }
+
+        public static void ProcessClassifiedPDFs()
+        {
+            List<string> FVs = new List<string>();
+            List<string> Attachments = new List<string>();
+            string OutputClassificationFolder = ConfigurationManager.AppSettings.Get("OutputClassificationFolder");
+            string[] pdfarray = Directory.GetFiles(OutputClassificationFolder, "*.pdf");
+
+            foreach (string pdf in pdfarray)
+            {
+                if (pdf.Contains("F_"))
+                {
+                    FVs.Add(pdf);
+                }
+                else if (pdf.Contains("Z_"))
+                {
+                    Attachments.Add(pdf);
+                }
+            }
+            foreach (string FV in FVs)
+            {
+                MergePDF(FV, Attachments);
+            }
+
+            CleanupOutputClassificationFolder(pdfarray);
+        }
+
+        public static void CleanupOutputClassificationFolder(string[] PDFs)
+        {
+            foreach (string pdf in PDFs)
+            {
+                File.Delete(pdf);
+            }
+        }
+
+        public static void MergePDF(string FV, List<string> Attachments)
+        {
+            string FinalFVsDirectory = ConfigurationManager.AppSettings.Get("CompleteFVs");
+
+            List<string> PDF_To_Merge = new List<string>();
+            string bid = FV.Substring(GetNthIndex(FV, '_', 1) + 1);
+            bid = bid.Split('_')[0];
+            PDF_To_Merge.Add(FV);
+            ///////////////////////
+            foreach (string attachment in Attachments)
+            {
+                if (attachment.Contains(bid))
+                {
+                    PDF_To_Merge.Add(attachment);
+                }
+            }
+
+            PdfDocumentBase mergedPDF = PdfDocument.MergeFiles(PDF_To_Merge.ToArray());
+            string filename = Path.GetFileName(FV);
+            mergedPDF.Save(FinalFVsDirectory + filename);
+
+            int year = DateTime.Today.Year;
+            string FVnr = $"E{year}5" + GetNextFVNumber().ToString("D6");
+            ///Start Barcoder
+            System.Diagnostics.Process.Start(ConfigurationManager.AppSettings.Get("Barcoder"), $"\"{FinalFVsDirectory}{filename}\" {FVnr} barcode \"{FinalFVsDirectory}{filename}");
+
+        }
+
+        public static long GetNextFVNumber()
+        {
+            long FVNumber = 0;
+
+            const string userRoot = "HKEY_CURRENT_USER\\Software";
+            const string subkey = "LukardiSettings";
+            const string keyName = userRoot + "\\" + subkey;
+
+
+            Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\LukardiSettings");
+            if (key != null)
+            {
+                if (key.GetValue("CurrentFVNumber") != null)
+                {
+                    FVNumber = (long)key.GetValue("CurrentFVNumber");
+                    FVNumber++;
+                    Microsoft.Win32.Registry.SetValue(keyName, "CurrentFVNumber", FVNumber, Microsoft.Win32.RegistryValueKind.QWord);
+                }
+                else
+                {
+                    Microsoft.Win32.Registry.SetValue(keyName, "CurrentFVNumber", 1, Microsoft.Win32.RegistryValueKind.QWord);
+                    FVNumber = (long)key.GetValue("CurrentFVNumber");
+                }
+                key.Close();
+            }
+            else
+            {
+                Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"SOFTWARE\LukardiSettings");
+                return 1;
+            }
+            return FVNumber;
+        }
+
+        public static int GetNthIndex(string s, char t, int n)
+        {
+            int count = 0;
+            for (int i = 0; i < s.Length; i++)
+            {
+                if (s[i] == t)
+                {
+                    count++;
+                    if (count == n)
+                    {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
+
     }
 }

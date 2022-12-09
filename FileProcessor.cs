@@ -25,8 +25,10 @@ namespace PGNiG_FileProcessor
 
         protected override void OnStart(string[] args)
         {
+            Spire.License.LicenseProvider.SetLicenseFileName(@"C:\FileGathererFiles\license.elic");
+
             Timer timer = new Timer();
-            timer.Interval = 30000; // 120 seconds
+            timer.Interval = 30000; // 30 seconds
             timer.Elapsed += new ElapsedEventHandler(OnTimer);
             timer.Start();
         }
@@ -35,14 +37,17 @@ namespace PGNiG_FileProcessor
         {
             FileGatherer.CollectNetworkFiles();
             FileGatherer.DownloadMessages();
-
+            FileGatherer.ProcessClassifiedPDFs();
+            
+           
+           
         }
 
         protected override void OnStop()
         {
-
+            
         }
 
-
+      
     }
 }
