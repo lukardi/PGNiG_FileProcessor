@@ -24,6 +24,7 @@ using Spire.Pdf.Graphics;
 using CredentialManagement;
 using MsgReader.Outlook;
 using System.Diagnostics;
+using MailKit.Net.Smtp;
 
 namespace PGNiG_FileProcessor
 {
@@ -234,24 +235,13 @@ namespace PGNiG_FileProcessor
                 MyWebClient webClient = new MyWebClient();
                 try
                 {
-                    //client.Connect("10.88.99.18", 993, SecureSocketOptions.Auto);
-                     //client.Connect("imap-akquinet.ogicom.pl", 993, SecureSocketOptions.SslOnConnect);
-                    //client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-                    //client.CheckCertificateRevocation = false;
                      client.Connect("imap.pgnig.pl", 143, SecureSocketOptions.StartTls);
-                    // client.SslProtocols.
-                    //client.Connect("10.88.99.18", 993, SecureSocketOptions.StartTls);
-                    //client.Connect("ex35.gas.pgnig.pl", 143, SecureSocketOptions.Auto);
-
-
 
                     string CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
                     client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
                     client.Inbox.Open(MailKit.FolderAccess.ReadWrite);
                     var folder = client.Inbox.GetSubfolders();
-                    //CreateMailBodyPDFFile(folder.ToString(), @"C:\test");
-                    //Console.WriteLine(client.ToString());
-                    //var subfolder = client.Inbox.GetSubfolder("Do importu");
+
                     var subfolder = client.Inbox.GetSubfolder("Do Importu");
                     subfolder.Open(MailKit.FolderAccess.ReadWrite);
                     ////
@@ -263,6 +253,72 @@ namespace PGNiG_FileProcessor
                         GetAttachments(message);
                         subfolder.MoveTo(item.UniqueId, client.Inbox.GetSubfolder("Zaimportowane"));
                     }
+                    ////
+                }
+                catch (Exception ex)
+                {
+                    //CreateMailBodyPDFFile(ex.Message, @"C:\test");
+                    Console.WriteLine("There was an error: {0}", ex.Message);
+                }
+
+                client.Disconnect(true);
+            }
+        }
+
+        public static void SendErrorMail(MimeMessage message)
+        {
+            using (var client = new SmtpClient(new ProtocolLogger("smtp.log")))
+            {
+                MyWebClient webClient = new MyWebClient();
+                try
+                {
+                    client.Connect("smtp.pgnig.pl", 25, SecureSocketOptions.Auto);
+
+                    string CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
+                    client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
+                    string mailmessage = "Drogi Użytkowniku, faktura z załączonego maila nie została poprawnie przetworzona." + Environment.NewLine + "Proszę o ponowne podjęcie załącznika z maila i ponowne wprowadzenie do systemu." + Environment.NewLine + "* to jest powiadomienie systemowe, proszę na nie odpowiadać";
+
+                    //var message = new MimeMessage();
+                    message.From.Add(new MailboxAddress("TestSender", "EfakturaODtest@pgnig.pl"));
+                    message.To.Add(new MailboxAddress("TestReceiver", "EfakturaODtest@pgnig.pl"));
+                    message.Subject = "Wystąpił błąd";
+                    message.Body = new TextPart("plain")
+                    {
+                        Text = mailmessage
+                    };
+                    client.Send(message);
+                    client.Disconnect(true);
+
+                }
+                catch (Exception ex)
+                {
+                    //CreateMailBodyPDFFile(ex.Message, @"C:\test");
+                    Console.WriteLine("There was an error: {0}", ex.Message);
+                }
+
+                client.Disconnect(true);
+            }
+        }
+
+        public static void ReturnMessageToINBOX(IMessageSummary msgsummary)
+        {
+
+            using (var client = new ImapClient(new ProtocolLogger("imap.log")))
+            {
+                MyWebClient webClient = new MyWebClient();
+                try
+                {
+                    client.Connect("imap.pgnig.pl", 143, SecureSocketOptions.StartTls);
+
+                    string CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
+                    client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
+                    client.Inbox.Open(MailKit.FolderAccess.ReadWrite);
+                    var folder = client.Inbox.GetSubfolders();
+
+                    var subfolder = client.Inbox.GetSubfolder("Do Importu");
+                    subfolder.Open(MailKit.FolderAccess.ReadWrite);
+
+                    subfolder.MoveTo(msgsummary.UniqueId, client.Inbox);
                     ////
                 }
                 catch (Exception ex)
