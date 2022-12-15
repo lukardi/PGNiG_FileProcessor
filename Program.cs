@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MimeKit;
+using System;
 using System.ServiceProcess;
 
 namespace PGNiG_FileProcessor

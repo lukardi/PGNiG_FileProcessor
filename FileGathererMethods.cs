@@ -1,70 +1,39 @@
-﻿using System;
-using System.Configuration;
-using System.Collections.Specialized;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.IO;
-////ZIP
-using System.IO.Compression;
+﻿///////Credentials
+using MailKit;
+using MailKit.Net.Imap;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 ////////Mail Libraries
 using MimeKit;
-using MailKit;
-using MailKit.Search;
-using MailKit.Security;
-using MailKit.Net.Imap;
+using MsgReader.Outlook;
 /////////SPIRE PDF
 using Spire.Pdf;
 using Spire.Pdf.Graphics;
-///////Credentials
-using CredentialManagement;
-using MsgReader.Outlook;
-using System.Diagnostics;
-using MailKit.Net.Smtp;
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Data;
+using System.Drawing;
+using System.IO;
+////ZIP
+using System.IO.Compression;
+using System.Linq;
+using System.Text;
+//
+using Microsoft.Win32;
+using Spire.Pdf.Exporting.XPS.Schema;
 
 namespace PGNiG_FileProcessor
 {
     public class FileGatherer
     {
-        public class MyWebClient
-        {
-            public string GetPassword(String KeyPair)
-            {
-                try
-                {
-                    using (var cred = new Credential())
-                    {
-                        cred.Target = KeyPair;
-                        cred.Load();
-                        return cred.Password;
-                    }
-                }
-                catch (Exception ex)
-                {
-                }
-                return "";
-            }
-            public string GetUsername(String KeyPair)
-            {
-                try
-                {
-                    using (var cred = new Credential())
-                    {
-                        cred.Target = KeyPair;
-                        cred.Load();
-                        return cred.Username;
-                    }
-                }
-                catch (Exception ex)
-                {
-                }
-                return "";
-            }
+        const string RegisterKey = "HKEY_CURRENT_USER\\Software\\LukardiSettings";
 
+        public static void Run()
+        {
+            CollectNetworkFiles();
+            DownloadMessages();
+            ProcessClassifiedPDFs();
         }
 
         public static void ConvertOfficeFiles(string path)
@@ -90,8 +59,6 @@ namespace PGNiG_FileProcessor
         public static void CollectNetworkFiles()
         {
             string NetworkFolder = ConfigurationManager.AppSettings.Get("NetworkFolder");
-            string InputClassificationFolder = ConfigurationManager.AppSettings.Get("InputClassificationFolder");
-            string InitialFolder = ConfigurationManager.AppSettings.Get("InitialFolder");
             string ProcessedZIPFilesFolder = ConfigurationManager.AppSettings.Get("ProcessedZIPFiles");
 
             try
@@ -101,15 +68,15 @@ namespace PGNiG_FileProcessor
                 {
                     GetAttachmentsFromZIPFile(zipfile);
                     //File.Delete(zipfile);
-                    File.Move(zipfile, ProcessedZIPFilesFolder+@"\"+Path.GetFileName(zipfile));
-                    
+                    File.Move(zipfile, ProcessedZIPFilesFolder + @"\" + System.IO.Path.GetFileName(zipfile));
+
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine("There was an error: {0}", ex.Message);
             }
-            
+
 
         }
 
@@ -119,11 +86,11 @@ namespace PGNiG_FileProcessor
             string InitialFolder = ConfigurationManager.AppSettings.Get("InitialFolder");
 
             string path = $"{InitialFolder}\\temp";
-            System.IO.Directory.CreateDirectory(path);
+            Directory.CreateDirectory(path);
             ZipFile.ExtractToDirectory(zipfile, path);
 
             string[] array = Directory.GetFiles(path, "*.msg");
-            MsgReader.Outlook.Storage.Message messagefile = new Storage.Message(array[0], FileAccess.ReadWrite);
+            Storage.Message messagefile = new Storage.Message(array[0], FileAccess.ReadWrite);
             string date = messagefile.Headers.DateSent.ToLocalTime().ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
 
             CreateMailBodyPDFFile(messagefile.BodyText, path);
@@ -138,7 +105,6 @@ namespace PGNiG_FileProcessor
 
         public static void MoveFolderForClassification(string inputFolder, string outputFolder, string date)
         {
-            string InputClassificationFolder = ConfigurationManager.AppSettings.Get("InputClassificationFolder");
             Directory.Move(inputFolder, $"{outputFolder}\\{date}");
             ConvertOfficeFiles($"{outputFolder}\\{date}");
             CreateSignalFile($"{outputFolder}\\{date}");
@@ -156,8 +122,9 @@ namespace PGNiG_FileProcessor
 
         }
 
-        public static void CreateMailBodyPDFFile(string message, string path)
+        public static string CreateMailBodyPDFFile(string message, string path)
         {
+            string file = path + "\\MailBody.pdf";
             string MailBody = message;
             PdfDocument pdf = new PdfDocument();
             PdfPageBase page = pdf.Pages.Add();
@@ -172,33 +139,21 @@ namespace PGNiG_FileProcessor
             textWidget.StringFormat = format;
             RectangleF bounds = new RectangleF(new PointF(10, 25), page.Canvas.ClientSize);
             textWidget.Draw(page, bounds, textLayout);
-            
 
-            pdf.SaveToFile(path + "\\MailBody.pdf", Spire.Pdf.FileFormat.PDF);
 
+            pdf.SaveToFile(file, FileFormat.PDF);
+            return file;
         }
 
-        public static void GetAttachments(MimeMessage message)
+        public static void GetAttachments(MimeMessage message, string date, string path)
         {
-            string InitialFolder = ConfigurationManager.AppSettings.Get("InitialFolder");
-            string date = message.Date.DateTime.ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
-            //string path = $"C:\\InitialFolder\\{date}";
-            string path = $"{InitialFolder}\\{date}";
-
-            System.IO.Directory.CreateDirectory(path);
-
-
             foreach (var attachment in message.Attachments)
             {
                 var fileName = attachment.ContentDisposition?.FileName ?? attachment.ContentType.Name;
-
-
                 using (var stream = File.Create(path + "\\" + fileName))
                 {
-                    if (attachment is MessagePart)
+                    if (attachment is MessagePart rfc822)
                     {
-                        var rfc822 = (MessagePart)attachment;
-
                         rfc822.Message.WriteTo(stream);
                     }
                     else
@@ -217,43 +172,52 @@ namespace PGNiG_FileProcessor
                 }
 
             }
-
-            CreateMailBodyPDFFile(message.Date.ToLocalTime()+System.Environment.NewLine+message.Subject+System.Environment.NewLine+message.TextBody, path);
-            //CreateSignalFile(path);
-
-            string InputClassificationFolder = ConfigurationManager.AppSettings.Get("InputClassificationFolder");
-            //Directory.Move(path, $"{InputClassificationFolder}\\{date}");
-            MoveFolderForClassification(path, InputClassificationFolder, date);
-
-
         }
 
         public static void DownloadMessages()
         {
+            string InitialFolder = ConfigurationManager.AppSettings.Get("InitialFolder");
             using (var client = new ImapClient(new ProtocolLogger("imap.log")))
             {
                 MyWebClient webClient = new MyWebClient();
                 try
                 {
-                     client.Connect("imap.pgnig.pl", 143, SecureSocketOptions.StartTls);
-
+                    client.Connect("imap.pgnig.pl", 143, SecureSocketOptions.StartTls);
                     string CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
                     client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
-                    client.Inbox.Open(MailKit.FolderAccess.ReadWrite);
+                    client.Inbox.Open(FolderAccess.ReadWrite);
                     var folder = client.Inbox.GetSubfolders();
-
                     var subfolder = client.Inbox.GetSubfolder("Do Importu");
-                    subfolder.Open(MailKit.FolderAccess.ReadWrite);
-                    ////
+                    subfolder.Open(FolderAccess.ReadWrite);
                     var items = subfolder.Fetch(0, -1, MessageSummaryItems.UniqueId | MessageSummaryItems.Size | MessageSummaryItems.Flags);
-                    // iterate over all of the messages and fetch them by UID
                     foreach (var item in items)
                     {
                         var message = subfolder.GetMessage(item.UniqueId);
-                        GetAttachments(message);
-                        subfolder.MoveTo(item.UniqueId, client.Inbox.GetSubfolder("Zaimportowane"));
+                        string mailPDF = null;
+                        string date = message.Date.DateTime.ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
+                        string path = $"{InitialFolder}\\{date}";
+                        try
+                        {
+                            Directory.CreateDirectory(path);
+                            mailPDF = CreateMailBodyPDFFile(message.Date.ToLocalTime() + Environment.NewLine + message.Subject + Environment.NewLine + message.TextBody, path);
+                            GetAttachments(message, date, path);
+                            string InputClassificationFolder = ConfigurationManager.AppSettings.Get("InputClassificationFolder");
+                            MoveFolderForClassification(path, InputClassificationFolder, date);
+                        }
+                        catch (Exception msgEx)
+                        {
+                            SendErrorMail(message, mailPDF);
+                            Console.WriteLine("There was an error: {0}", msgEx.Message);
+                        }
+                        finally
+                        {
+                            if (Directory.Exists(path))
+                            {
+                                Directory.Delete(path, true);
+                            }
+                            subfolder.MoveTo(item.UniqueId, client.Inbox.GetSubfolder("Zaimportowane"));
+                        }
                     }
-                    ////
                 }
                 catch (Exception ex)
                 {
@@ -265,38 +229,60 @@ namespace PGNiG_FileProcessor
             }
         }
 
-        public static void SendErrorMail(MimeMessage message)
+        public static void SendErrorMail(MimeMessage originalMessage, string mailPDF = null)
         {
             using (var client = new SmtpClient(new ProtocolLogger("smtp.log")))
             {
                 MyWebClient webClient = new MyWebClient();
                 try
                 {
-                    client.Connect("smtp.pgnig.pl", 25, SecureSocketOptions.Auto);
-
+                    client.Connect(ConfigurationManager.AppSettings.Get("SMTPServer"), 25, SecureSocketOptions.Auto);
                     string CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
                     client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
-                    string mailmessage = "Drogi Użytkowniku, faktura z załączonego maila nie została poprawnie przetworzona." + Environment.NewLine + "Proszę o ponowne podjęcie załącznika z maila i ponowne wprowadzenie do systemu." + Environment.NewLine + "* to jest powiadomienie systemowe, proszę na nie odpowiadać";
 
-                    //var message = new MimeMessage();
-                    message.From.Add(new MailboxAddress("TestSender", "EfakturaODtest@pgnig.pl"));
-                    message.To.Add(new MailboxAddress("TestReceiver", "EfakturaODtest@pgnig.pl"));
-                    message.Subject = "Wystąpił błąd";
+                    var message = new MimeMessage();
+                    message.From.Add(new MailboxAddress("Service Error", "EfakturaODtest@pgnig.pl"));
+                    //
+                    var emails = ConfigurationManager.AppSettings.Get("ErrorMailReceivers").Split(';').ToList();
+                    emails.RemoveAll(s => string.IsNullOrEmpty(s));
+                    foreach (var email in emails)
+                    {
+                        message.To.Add(new MailboxAddress(email, email));
+                    }
+                    message.Subject = "[Wystąpił błąd] " + originalMessage.Subject;
                     message.Body = new TextPart("plain")
                     {
-                        Text = mailmessage
+                        Text = "Drogi Użytkowniku, faktura z załączonego maila nie została poprawnie przetworzona."
+                        + Environment.NewLine
+                        + "Proszę o ponowne podjęcie załącznika z maila i ponowne wprowadzenie do systemu."
+                        + Environment.NewLine
+                        + "* to jest powiadomienie systemowe, proszę na nie odpowiadać"
                     };
+                    if (mailPDF != null)
+                    {
+                        var attachment = new MimePart("application", "pdf")
+                        {
+                            Content = new MimeContent(File.OpenRead(mailPDF)),
+                            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                            ContentTransferEncoding = ContentEncoding.Base64,
+                            FileName = System.IO.Path.GetFileName(mailPDF)
+                        };
+                        message.Body = new Multipart("mixed")
+                        {
+                            message.Body,
+                            attachment
+                        };
+                    }
                     client.Send(message);
-                    client.Disconnect(true);
-
                 }
                 catch (Exception ex)
                 {
-                    //CreateMailBodyPDFFile(ex.Message, @"C:\test");
                     Console.WriteLine("There was an error: {0}", ex.Message);
                 }
-
-                client.Disconnect(true);
+                finally
+                {
+                    client.Disconnect(true);
+                }
             }
         }
 
@@ -336,8 +322,8 @@ namespace PGNiG_FileProcessor
             string[] extensions = { ".docx#", ".doc#", ".xls#", ".xlsx#", ".rtf#", ".ods#", ".odt#", ".docx", ".doc", ".xls", ".xlsx", ".rtf", ".ods", ".odt" };
             string[] officefiles = Directory.GetFiles(path, "*.*")
                 .Where(f => extensions.Contains(new FileInfo(f).Extension.ToLower())).ToArray();
-           
-            foreach(string file in officefiles)
+
+            foreach (string file in officefiles)
             {
                 File.Delete(file);
             }
@@ -365,7 +351,6 @@ namespace PGNiG_FileProcessor
             {
                 MergePDF(FV, Attachments);
             }
-
             CleanupOutputClassificationFolder(pdfarray);
         }
 
@@ -395,7 +380,7 @@ namespace PGNiG_FileProcessor
             }
 
             PdfDocumentBase mergedPDF = PdfDocument.MergeFiles(PDF_To_Merge.ToArray());
-            string filename = Path.GetFileName(FV);
+            string filename = System.IO.Path.GetFileName(FV);
             mergedPDF.Save(FinalFVsDirectory + filename);
 
             int year = DateTime.Today.Year;
@@ -407,32 +392,26 @@ namespace PGNiG_FileProcessor
 
         public static long GetNextFVNumber()
         {
-            long FVNumber = 0;
-
-            const string userRoot = "HKEY_CURRENT_USER\\Software";
-            const string subkey = "LukardiSettings";
-            const string keyName = userRoot + "\\" + subkey;
-
-
-            Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\LukardiSettings");
+            long FVNumber;
+            RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\LukardiSettings");
             if (key != null)
             {
                 if (key.GetValue("CurrentFVNumber") != null)
                 {
                     FVNumber = (long)key.GetValue("CurrentFVNumber");
                     FVNumber++;
-                    Microsoft.Win32.Registry.SetValue(keyName, "CurrentFVNumber", FVNumber, Microsoft.Win32.RegistryValueKind.QWord);
+                    Registry.SetValue(RegisterKey, "CurrentFVNumber", FVNumber, RegistryValueKind.QWord);
                 }
                 else
                 {
-                    Microsoft.Win32.Registry.SetValue(keyName, "CurrentFVNumber", 1, Microsoft.Win32.RegistryValueKind.QWord);
+                    Registry.SetValue(RegisterKey, "CurrentFVNumber", 1, RegistryValueKind.QWord);
                     FVNumber = (long)key.GetValue("CurrentFVNumber");
                 }
                 key.Close();
             }
             else
             {
-                Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"SOFTWARE\LukardiSettings");
+                Registry.CurrentUser.CreateSubKey(@"SOFTWARE\LukardiSettings");
                 return 1;
             }
             return FVNumber;
