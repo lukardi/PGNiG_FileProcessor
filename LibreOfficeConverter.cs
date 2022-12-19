@@ -40,6 +40,7 @@ namespace PGNiG_FileProcessor
             CheckUserData();
             if (!Directory.Exists(outputPath))
             {
+                Logger.Debug($"Creating directory {outputPath}");
                 Directory.CreateDirectory(outputPath);
             }
             return Process(inputPath, outputPath);
@@ -76,11 +77,13 @@ namespace PGNiG_FileProcessor
             {
                 inputPath = Path.Combine(inputPath, "*");
             }
+            Logger.Debug($"Macro for: {inputPath}");
             //Run macro to set page scale
             Exec(new List<string> {
                 $"\"{inputPath}\"",
                 "\"macro:///Standard.Module1.FitToPage\"",
             });
+            Logger.Debug($"Convert for: {inputPath}");
             //Run conversion
             return Exec(new List<string> {
                 "--convert-to pdf",
@@ -109,6 +112,7 @@ namespace PGNiG_FileProcessor
             {
                 if (headless)
                 {
+                    Logger.Info($"Killing LibreOffice process: {process.Id}");
                     process.Kill();
                 }
                 else
@@ -116,6 +120,7 @@ namespace PGNiG_FileProcessor
                     process.WaitForExit();
                 }
             }
+            Logger.Debug($"LibreOffice exit code: {process.ExitCode}");
             return process.ExitCode;
         }
     }

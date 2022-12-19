@@ -1,5 +1,6 @@
 ﻿using MimeKit;
 using System;
+using System.Configuration;
 using System.ServiceProcess;
 
 namespace PGNiG_FileProcessor
@@ -12,8 +13,12 @@ namespace PGNiG_FileProcessor
         /// </summary>
         static void Main(string[] args)
         {
+            Spire.License.LicenseProvider.SetLicenseFileFullPath(ConfigurationManager.AppSettings.Get("SpireLicenseFilepath"));
+            Logger.Init();
+            FileGatherer.Init();
             if (Environment.UserInteractive)
             {
+                Logger.console = true;
                 RunTestService(args);
                 Console.WriteLine("Press any key to stop...");
                 Console.ReadKey();

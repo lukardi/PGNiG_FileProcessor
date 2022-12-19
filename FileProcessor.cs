@@ -1,4 +1,5 @@
-﻿using System.ServiceProcess;
+﻿using System.Configuration;
+using System.ServiceProcess;
 using System.Timers;
 
 namespace PGNiG_FileProcessor
@@ -17,16 +18,20 @@ namespace PGNiG_FileProcessor
 
         protected override void OnStart(string[] args)
         {
-            Spire.License.LicenseProvider.SetLicenseFileName(@"C:\FileGathererFiles\license.elic");
             Timer timer = new Timer
             {
-                Interval = 30 * 1000 // 30 seconds
+                Interval = int.Parse(ConfigurationManager.AppSettings.Get("TimerInterval")) * 1000
             };
-            timer.Elapsed += new ElapsedEventHandler(OnTimer);
+            timer.Elapsed += new ElapsedEventHandler((object sender, ElapsedEventArgs timerArgs) =>
+            {
+                timer.Stop();
+                OnTimer();
+                timer.Start();
+            });
             timer.Start();
         }
 
-        public void OnTimer(object sender, ElapsedEventArgs args)
+        public void OnTimer()
         {
             FileGatherer.Run();
         }

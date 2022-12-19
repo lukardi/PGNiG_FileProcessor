@@ -19,6 +19,7 @@ namespace PGNiG_FileProcessor
             }
             catch (Exception ex)
             {
+                Logger.Error(ex);
             }
             return "";
         }
@@ -35,6 +36,7 @@ namespace PGNiG_FileProcessor
             }
             catch (Exception ex)
             {
+                Logger.Error(ex);
             }
             return "";
         }

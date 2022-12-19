@@ -1,12 +1,11 @@
-﻿///////Credentials
-using MailKit;
+﻿using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Smtp;
 using MailKit.Security;
-////////Mail Libraries
+//
 using MimeKit;
 using MsgReader.Outlook;
-/////////SPIRE PDF
+//
 using Spire.Pdf;
 using Spire.Pdf.Graphics;
 using System;
@@ -15,39 +14,48 @@ using System.Configuration;
 using System.Data;
 using System.Drawing;
 using System.IO;
-////ZIP
+//
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
 //
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
+using RtfPipe.Tokens;
 
 namespace PGNiG_FileProcessor
 {
     public class FileGatherer
     {
-        private static readonly string RegisterKey = "SOFTWARE\\LukardiSettings";
-        private static readonly string RegisterValueKey = "CurrentFVNumber";
+        private static string RegisterKey = "SOFTWARE\\LukardiSettings";
+        private static string RegisterValueKey;
         //
-        private static readonly string SourceInboxFolderName = "Do Importu";
-        private static readonly string DestinationInboxFolderName = "Zaimportowane";
+        private static string SourceInboxFolderName;
+        private static string DestinationInboxFolderName;
         //
-        private static readonly string SMTPServer = ConfigurationManager.AppSettings.Get("SMTPServer");
-        private static readonly int SMTPPort = 25;
-        private static readonly string IMAPServer = "imap.pgnig.pl";
-        private static readonly int IMAPPort = 143;
+        private static string SMTPServer;
+        private static int SMTPPort;
+        private static string IMAPServer;
+        private static int IMAPPort;
         //
-        private static readonly string NetworkFolder = ConfigurationManager.AppSettings.Get("NetworkFolder");
-        private static readonly string ProcessedZIPFiles = ConfigurationManager.AppSettings.Get("ProcessedZIPFiles");
-        private static readonly string InputClassificationFolder = ConfigurationManager.AppSettings.Get("InputClassificationFolder");
-        private static readonly string InitialFolder = ConfigurationManager.AppSettings.Get("InitialFolder");
-        private static readonly string CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
-        private static readonly List<string> ErrorMailReceivers = ConfigurationManager.AppSettings.Get("ErrorMailReceivers").Split(';').ToList();
-        private static readonly string OutputClassificationFolder = ConfigurationManager.AppSettings.Get("OutputClassificationFolder");
-        private static readonly string CompleteFVs = ConfigurationManager.AppSettings.Get("CompleteFVs");
-        private static readonly string Barcoder = ConfigurationManager.AppSettings.Get("Barcoder");
+        private static string NetworkFolder;
+        private static string ProcessedZIPFiles;
+        private static string InputClassificationFolder;
+        private static string InitialFolder;
+        private static string OutputClassificationFolder;
+        private static string CompleteFVs;
+        private static string TmpCompleteFVs;
         //
+        private static string Barcoder;
+        //
+        private static string CredentialPairName;
+        private static List<string> ErrorMailReceivers;
+        //
+        private static Regex bidRegex = new Regex(@"_bid(\d+)_");
+        //
+        private static string imapLog = "imap.log";
+        private static string smtpLog = "smtp.log";
 
         private static readonly string[] extensions = {
                 ".docx#",
@@ -67,11 +75,64 @@ namespace PGNiG_FileProcessor
                 ".odt"
             };
 
+        public static void Init()
+        {
+            RegisterValueKey = ConfigurationManager.AppSettings.Get("RegisterValueKey");
+            //
+            SourceInboxFolderName = ConfigurationManager.AppSettings.Get("SourceFolderName");
+            DestinationInboxFolderName = ConfigurationManager.AppSettings.Get("DestinationFolderName");
+            //
+            SMTPServer = ConfigurationManager.AppSettings.Get("SMTPServer");
+            SMTPPort = int.Parse(ConfigurationManager.AppSettings.Get("SMTPPort"));
+            IMAPServer = ConfigurationManager.AppSettings.Get("IMAPServer");
+            IMAPPort = int.Parse(ConfigurationManager.AppSettings.Get("IMAPPort"));
+            //
+            NetworkFolder = ConfigurationManager.AppSettings.Get("NetworkFolder");
+            ProcessedZIPFiles = ConfigurationManager.AppSettings.Get("ProcessedZIPFiles");
+            InputClassificationFolder = ConfigurationManager.AppSettings.Get("InputClassificationFolder");
+            InitialFolder = ConfigurationManager.AppSettings.Get("InitialFolder");
+            OutputClassificationFolder = ConfigurationManager.AppSettings.Get("OutputClassificationFolder");
+            CompleteFVs = ConfigurationManager.AppSettings.Get("CompleteFVs");
+            TmpCompleteFVs = Path.Combine(CompleteFVs, "temp");
+            //
+            Barcoder = ConfigurationManager.AppSettings.Get("Barcoder");
+            //
+            CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
+            ErrorMailReceivers = ConfigurationManager.AppSettings.Get("ErrorMailReceivers").Split(';').ToList();
+            //
+            imapLog = Logger.GenerateFile("imap");
+            smtpLog = Logger.GenerateFile("smtp");
+            foreach (var dir in new List<string>() {
+                ProcessedZIPFiles,
+                InputClassificationFolder,
+                InitialFolder,
+                OutputClassificationFolder,
+                CompleteFVs,
+                TmpCompleteFVs
+            })
+            {
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+            }
+        }
+
         public static void Run()
         {
-            CollectNetworkFiles();
-            DownloadMessages();
-            ProcessClassifiedPDFs();
+            try
+            {
+                Logger.Debug("Classify pdfs...");
+                ProcessClassifiedPDFs();
+                Logger.Debug("Check network files...");
+                CollectNetworkFiles();
+                Logger.Debug("Download messages from inbox...");
+                DownloadMessages();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+            }
         }
 
         public static void ConvertOfficeFiles(string path)
@@ -83,52 +144,73 @@ namespace PGNiG_FileProcessor
                 .Where(f => extensions.Contains(new FileInfo(f).Extension.ToLower())).ToArray();
                 foreach (string file in officefiles)
                 {
+                    Logger.Debug($"Convert to pdf: {file}");
                     LibreOfficeConverter.Run(file, path);
                 }
                 CleanUpLockLibreFiles(path);
             }
             catch (Exception ex)
             {
-                Console.WriteLine("There was an error: {0}", ex.Message);
+                Logger.Error(ex);
             }
 
         }
 
         public static void CollectNetworkFiles()
         {
-            try
+            foreach (string file in Directory.GetFiles(NetworkFolder, "*.zip"))
             {
-                string[] array2 = Directory.GetFiles(NetworkFolder, "*.zip");
-                foreach (string zipfile in array2)
+                try
                 {
-                    GetAttachmentsFromZIPFile(zipfile);
-                    //File.Delete(zipfile);
-                    File.Move(zipfile, ProcessedZIPFiles + @"\" + Path.GetFileName(zipfile));
+                    GetAttachmentsFromZIPFile(file);
+                    Logger.Debug($"Moving processed zip: {file}");
+                    File.Move(file, ProcessedZIPFiles + @"\" + Path.GetFileName(file));
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("There was an error: {0}", ex.Message);
+                catch (Exception ex)
+                {
+                    Logger.Error(ex);
+                    SendErrorMail(new MimeMessage()
+                    {
+                        Subject = $"Archiwum {file}"
+                    });
+                }
             }
         }
 
         public static void GetAttachmentsFromZIPFile(string zipfile)
         {
+            Logger.Debug($"Extracting file: {zipfile}");
             string path = $"{InitialFolder}\\temp";
-            Directory.CreateDirectory(path);
+            if (!Directory.Exists(path))
+            {
+                Logger.Debug($"Creating temp directory: {path}");
+                Directory.CreateDirectory(path);
+            }
+            else
+            {
+                Logger.Debug($"Cleanup temp directory: {path}");
+                foreach (var item in Directory.GetDirectories(path))
+                {
+                    Directory.Delete(item, true);
+                }
+                foreach (var item in Directory.GetFiles(path))
+                {
+                    File.Delete(item);
+                }
+            }
             ZipFile.ExtractToDirectory(zipfile, path);
-            string[] array = Directory.GetFiles(path, "*.msg");
-            Storage.Message messagefile = new Storage.Message(array[0], FileAccess.ReadWrite);
+            string[] files = Directory.GetFiles(path, "*.msg");
+            if (files.Length <= 0)
+            {
+                throw new Exception($"Couldn't find msg file in directory: {path}");
+            }
+            string msgFile = files.First();
+            Storage.Message messagefile = new Storage.Message(msgFile, FileAccess.ReadWrite);
             string date = messagefile.Headers.DateSent.ToLocalTime().ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
-
             CreateMailBodyPDFFile(messagefile.BodyText, path);
-            //CreateSignalFile(path);
             messagefile.Dispose();
-
-            File.Delete(array[0]);
+            File.Delete(msgFile);
             MoveFolderForClassification(path, InputClassificationFolder, date);
-            //Directory.Delete(path, true);
-
         }
 
         public static void MoveFolderForClassification(string inputFolder, string outputFolder, string date)
@@ -140,10 +222,8 @@ namespace PGNiG_FileProcessor
 
         public static void CreateSignalFile(string path)
         {
-            // Create a new file     
             using (FileStream fs = File.Create(path + "\\SignalFile.xml"))
             {
-                // Add some text to file    
                 byte[] author = new UTF8Encoding(true).GetBytes("1");
                 fs.Write(author, 0, author.Length);
             }
@@ -171,7 +251,12 @@ namespace PGNiG_FileProcessor
             };
             RectangleF bounds = new RectangleF(new PointF(10, 25), page.Canvas.ClientSize);
             textWidget.Draw(page, bounds, textLayout);
+            Logger.Debug($"Save mail to pdf: {file}");
             pdf.SaveToFile(file, FileFormat.PDF);
+            if (!File.Exists(file))
+            {
+                throw new Exception($"Couldn't save mail body to pdf: {file}");
+            }
             return file;
         }
 
@@ -180,8 +265,10 @@ namespace PGNiG_FileProcessor
             foreach (var attachment in message.Attachments)
             {
                 var fileName = attachment.ContentDisposition?.FileName ?? attachment.ContentType.Name;
-                using (var stream = File.Create(path + "\\" + fileName))
+                var file = Path.Combine(path, fileName);
+                using (var stream = File.Create(file))
                 {
+                    Logger.Debug($"Saving attachement file: {file}");
                     if (attachment is MessagePart rfc822)
                     {
                         rfc822.Message.WriteTo(stream);
@@ -189,16 +276,15 @@ namespace PGNiG_FileProcessor
                     else
                     {
                         var part = (MimePart)attachment;
-
                         part.Content.DecodeTo(stream);
                     }
                 }
                 if (attachment.ContentType.MimeType.Equals("application/x-zip-compressed"))
                 {
-                    string zipPath = path + "\\" + fileName;
-                    string extractPath = path;
-                    ZipFile.ExtractToDirectory(zipPath, extractPath);
-                    File.Delete(zipPath);
+                    Logger.Debug($"Attachement iz zip so extract it: {file} to {path}");
+                    ZipFile.ExtractToDirectory(file, path);
+                    Logger.Debug("Delete source zip file");
+                    File.Delete(file);
                 }
 
             }
@@ -206,11 +292,12 @@ namespace PGNiG_FileProcessor
 
         public static void DownloadMessages()
         {
-            using (var client = new ImapClient(new ProtocolLogger("imap.log")))
+            using (var client = new ImapClient(new ProtocolLogger(imapLog)))
             {
                 MyWebClient webClient = new MyWebClient();
                 try
                 {
+                    Logger.Debug($"Connecting to IMAP server: {IMAPServer}:{IMAPPort}");
                     client.Connect(IMAPServer, IMAPPort, SecureSocketOptions.Auto);
                     client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
                     client.Inbox.Open(FolderAccess.ReadWrite);
@@ -218,8 +305,10 @@ namespace PGNiG_FileProcessor
                     var subfolder = client.Inbox.GetSubfolder(SourceInboxFolderName);
                     subfolder.Open(FolderAccess.ReadWrite);
                     var items = subfolder.Fetch(0, -1, MessageSummaryItems.UniqueId | MessageSummaryItems.Size | MessageSummaryItems.Flags);
+                    Logger.Debug($"Found {items.Count} mails");
                     foreach (var item in items)
                     {
+                        Logger.Debug($"Processing mail with UID: {item.UniqueId}");
                         var message = subfolder.GetMessage(item.UniqueId);
                         string mailPDF = null;
                         string date = message.Date.DateTime.ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
@@ -233,8 +322,8 @@ namespace PGNiG_FileProcessor
                         }
                         catch (Exception msgEx)
                         {
+                            Logger.Error(msgEx);
                             SendErrorMail(message, mailPDF);
-                            Console.WriteLine("There was an error: {0}", msgEx.Message);
                         }
                         finally
                         {
@@ -248,8 +337,7 @@ namespace PGNiG_FileProcessor
                 }
                 catch (Exception ex)
                 {
-                    //CreateMailBodyPDFFile(ex.Message, @"C:\test");
-                    Console.WriteLine("There was an error: {0}", ex.Message);
+                    Logger.Error(ex);
                 }
 
                 client.Disconnect(true);
@@ -258,16 +346,18 @@ namespace PGNiG_FileProcessor
 
         public static void SendErrorMail(MimeMessage originalMessage, string mailPDF = null)
         {
-            using (var client = new SmtpClient(new ProtocolLogger("smtp.log")))
+            using (var client = new SmtpClient(new ProtocolLogger(smtpLog)))
             {
                 MyWebClient webClient = new MyWebClient();
                 try
                 {
+                    Logger.Debug($"Sending error mail with SMTP server: {SMTPServer}:{SMTPPort}");
                     client.Connect(SMTPServer, SMTPPort, SecureSocketOptions.Auto);
                     client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
 
                     var message = new MimeMessage();
                     message.From.Add(new MailboxAddress("Service Error", "EfakturaODtest@pgnig.pl"));
+                    Logger.Debug($"Recipients: {ErrorMailReceivers}");
                     foreach (var email in ErrorMailReceivers)
                     {
                         message.To.Add(new MailboxAddress(email, email));
@@ -290,6 +380,7 @@ namespace PGNiG_FileProcessor
                             ContentTransferEncoding = ContentEncoding.Base64,
                             FileName = Path.GetFileName(mailPDF)
                         };
+                        Logger.Debug($"Attaching file: {mailPDF}");
                         message.Body = new Multipart("mixed")
                         {
                             message.Body,
@@ -300,7 +391,7 @@ namespace PGNiG_FileProcessor
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("There was an error: {0}", ex.Message);
+                    Logger.Error(ex);
                 }
                 finally
                 {
@@ -312,26 +403,23 @@ namespace PGNiG_FileProcessor
         public static void ReturnMessageToINBOX(IMessageSummary msgsummary)
         {
 
-            using (var client = new ImapClient(new ProtocolLogger("imap.log")))
+            using (var client = new ImapClient(new ProtocolLogger(imapLog)))
             {
                 MyWebClient webClient = new MyWebClient();
                 try
                 {
-                    client.Connect("imap.pgnig.pl", 143, SecureSocketOptions.StartTls);
+                    Logger.Debug($"Move back message with UID: {msgsummary.UniqueId}");
+                    client.Connect(IMAPServer, IMAPPort, SecureSocketOptions.StartTls);
                     client.Authenticate(webClient.GetUsername(CredentialPairName), webClient.GetPassword(CredentialPairName));
                     client.Inbox.Open(FolderAccess.ReadWrite);
                     var folder = client.Inbox.GetSubfolders();
-
                     var subfolder = client.Inbox.GetSubfolder(SourceInboxFolderName);
                     subfolder.Open(FolderAccess.ReadWrite);
-
                     subfolder.MoveTo(msgsummary.UniqueId, client.Inbox);
-                    ////
                 }
                 catch (Exception ex)
                 {
-                    //CreateMailBodyPDFFile(ex.Message, @"C:\test");
-                    Console.WriteLine("There was an error: {0}", ex.Message);
+                    Logger.Error(ex);
                 }
 
                 client.Disconnect(true);
@@ -345,78 +433,121 @@ namespace PGNiG_FileProcessor
 
             foreach (string file in officefiles)
             {
+                Logger.Debug($"Removing lock file: {file}");
                 File.Delete(file);
             }
         }
 
+        public static string GetBid(string name)
+        {
+            var matches = bidRegex.Matches(name);
+            if (matches.Count > 0 && matches[0].Success)
+            {
+
+                return matches[0].Groups[0].Value;
+            }
+            return null;
+        }
+
         public static void ProcessClassifiedPDFs()
         {
-            List<string> FVs = new List<string>();
-            List<string> Attachments = new List<string>();
-            string[] pdfarray = Directory.GetFiles(OutputClassificationFolder, "*.pdf");
-
-            foreach (string pdf in pdfarray)
+            var invoices = new Dictionary<string, List<string>>();
+            var attachments = new Dictionary<string, List<string>>();
+            foreach (string pdf in Directory.GetFiles(OutputClassificationFolder, "*.pdf"))
             {
-                if (pdf.Contains("F_"))
+                var bid = GetBid(pdf);
+                if (bid == null || bid == "")
                 {
-                    FVs.Add(pdf);
+                    continue;
                 }
-                else if (pdf.Contains("Z_"))
+                Logger.Debug($"BID: {bid}");
+                var filename = Path.GetFileName(pdf);
+                if (filename.StartsWith("F_"))
                 {
-                    Attachments.Add(pdf);
+                    Logger.Debug($"Found invoice: {pdf}");
+                    if (!invoices.ContainsKey(bid))
+                    {
+                        invoices.Add(bid, new List<string>());
+                    }
+                    invoices[bid].Add(pdf);
+                }
+                else if (filename.StartsWith("Z_"))
+                {
+                    Logger.Debug($"Found attachement: {pdf}");
+                    if (!attachments.ContainsKey(bid))
+                    {
+                        attachments.Add(bid, new List<string>());
+                    }
+                    attachments[bid].Add(pdf);
+                }
+                else
+                {
+                    Logger.Debug($"Unknown file type: {pdf}");
                 }
             }
-            //TODO: Verify multiple FVs with only one attachements array
-            foreach (string FV in FVs)
+            var toRemove = new List<string>();
+            foreach (string bid in invoices.Keys)
             {
-                MergePDF(FV, Attachments);
+                foreach (string file in invoices[bid])
+                    try
+                    {
+                        var files = attachments.ContainsKey(bid) ? new List<string>(attachments[bid]) : new List<string>();
+                        files.Insert(0, file);
+                        MergePDF(file, files);
+                        toRemove.AddRange(files);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex);
+                    }
             }
-            //TODO: All files will be removed even when FVs wont be found
-            CleanupOutputClassificationFolder(pdfarray);
+            CleanupOutputClassificationFolder(toRemove.ToArray());
         }
 
         public static void CleanupOutputClassificationFolder(string[] PDFs)
         {
             foreach (string pdf in PDFs)
             {
+                Logger.Debug($"Cleaning: {pdf}");
                 File.Delete(pdf);
             }
         }
 
         public static void MergePDF(string FV, List<string> Attachments)
         {
-
-            List<string> PDF_To_Merge = new List<string>();
-            string bid = FV.Substring(GetNthIndex(FV, '_', 1) + 1);
-            bid = bid.Split('_')[0];
-            PDF_To_Merge.Add(FV);
-
-            foreach (string attachment in Attachments)
-            {
-                if (attachment.Contains(bid))
-                {
-                    PDF_To_Merge.Add(attachment);
-                }
-            }
-
-            PdfDocumentBase mergedPDF = PdfDocument.MergeFiles(PDF_To_Merge.ToArray());
+            Logger.Debug($"Merging files for: {FV}");
+            PdfDocumentBase mergedPDF = PdfDocument.MergeFiles(Attachments.ToArray());
             string filename = Path.GetFileName(FV);
-            var file = Path.Combine(CompleteFVs, filename);
+            var file = Path.Combine(TmpCompleteFVs, filename);
             mergedPDF.Save(file);
+            if (!File.Exists(file))
+            {
+                throw new Exception($"Coludn't merge pdfs. {file}");
+            }
             int year = DateTime.Today.Year;
             string FVnr = $"E{year}5" + GetNextFVNumber().ToString("D6");
-
-            RunBarcode(file, FVnr);
+            var barcodeFile = Path.Combine(CompleteFVs, filename);
+            if (!RunBarcode(file, FVnr, barcodeFile))
+            {
+                throw new Exception("Something went wrong with barcode");
+            }
+            File.Delete(file);
         }
 
-        public static void RunBarcode(string file, string number)
+        public static bool RunBarcode(string file, string number, string outputFile)
         {
-            Process.Start(Barcoder, "\"" + string.Join("\" \"", new List<string>() {
+            Logger.Debug($"Running barcode for file: {file}, number: {number}, output: {outputFile}");
+            using (var process = Process.Start(Barcoder, "\"" + string.Join("\" \"", new List<string>() {
                 file,
                 number,
                 "barcode",
-                file
-            }) + "\"").WaitForExit();
+                outputFile
+            }) + "\""))
+            {
+                process.WaitForExit();
+                Logger.Debug($"Barcode exit code: {process.ExitCode}");
+                return process.ExitCode == 0;
+            }
         }
 
         public static long GetNextFVNumber()
@@ -427,12 +558,14 @@ namespace PGNiG_FileProcessor
             {
                 if (key.GetValue(RegisterValueKey) != null)
                 {
+                    Logger.Debug($"Found value for key: {RegisterValueKey}");
                     FVNumber = (long)key.GetValue(RegisterValueKey);
                     FVNumber++;
                     Registry.SetValue($"HKEY_CURRENT_USER\\{RegisterKey}", RegisterValueKey, FVNumber, RegistryValueKind.QWord);
                 }
                 else
                 {
+                    Logger.Debug("Key doesn't exists.");
                     Registry.SetValue($"HKEY_CURRENT_USER\\{RegisterKey}", RegisterValueKey, 1, RegistryValueKind.QWord);
                     FVNumber = (long)key.GetValue(RegisterValueKey);
                 }
