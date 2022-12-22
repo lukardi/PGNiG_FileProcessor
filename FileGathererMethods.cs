@@ -22,7 +22,6 @@ using System.Text;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using RtfPipe.Tokens;
 
 namespace PGNiG_FileProcessor
 {
@@ -41,6 +40,7 @@ namespace PGNiG_FileProcessor
         //
         private static string NetworkFolder;
         private static string ProcessedZIPFiles;
+        private static string ErrorZIPFiles;
         private static string InputClassificationFolder;
         private static string InitialFolder;
         private static string OutputClassificationFolder;
@@ -51,11 +51,16 @@ namespace PGNiG_FileProcessor
         //
         private static string CredentialPairName;
         private static List<string> ErrorMailReceivers;
+        private static bool SendErrors = false;
         //
         private static Regex bidRegex = new Regex(@"_bid(\d+)_");
         //
         private static string imapLog = "imap.log";
         private static string smtpLog = "smtp.log";
+        //
+        private static string MailBodyFileName = "MailBody.pdf";
+        private static string SignalFileName = "SignalFile.xml";
+        private static string dateFormat = "yyyy-MM-ddTHH-mm-ss";
 
         private static readonly string[] extensions = {
                 ".docx#",
@@ -89,6 +94,7 @@ namespace PGNiG_FileProcessor
             //
             NetworkFolder = ConfigurationManager.AppSettings.Get("NetworkFolder");
             ProcessedZIPFiles = ConfigurationManager.AppSettings.Get("ProcessedZIPFiles");
+            ErrorZIPFiles = ConfigurationManager.AppSettings.Get("ErrorZIPFiles");
             InputClassificationFolder = ConfigurationManager.AppSettings.Get("InputClassificationFolder");
             InitialFolder = ConfigurationManager.AppSettings.Get("InitialFolder");
             OutputClassificationFolder = ConfigurationManager.AppSettings.Get("OutputClassificationFolder");
@@ -99,6 +105,7 @@ namespace PGNiG_FileProcessor
             //
             CredentialPairName = ConfigurationManager.AppSettings.Get("CredentialPairName");
             ErrorMailReceivers = ConfigurationManager.AppSettings.Get("ErrorMailReceivers").Split(';').ToList();
+            SendErrors = ConfigurationManager.AppSettings.Get("SendErrors") == "1";
             //
             imapLog = Logger.GenerateFile("imap");
             smtpLog = Logger.GenerateFile("smtp");
@@ -108,7 +115,8 @@ namespace PGNiG_FileProcessor
                 InitialFolder,
                 OutputClassificationFolder,
                 CompleteFVs,
-                TmpCompleteFVs
+                TmpCompleteFVs,
+                ErrorZIPFiles
             })
             {
                 if (!Directory.Exists(dir))
@@ -160,27 +168,39 @@ namespace PGNiG_FileProcessor
         {
             foreach (string file in Directory.GetFiles(NetworkFolder, "*.zip"))
             {
+                string destPath = null;
                 try
                 {
-                    GetAttachmentsFromZIPFile(file);
-                    Logger.Debug($"Moving processed zip: {file}");
-                    File.Move(file, ProcessedZIPFiles + @"\" + Path.GetFileName(file));
+                    destPath = GetAttachmentsFromZIPFile(file);
+                    MoveFileSafe(file, ProcessedZIPFiles);
                 }
                 catch (Exception ex)
                 {
                     Logger.Error(ex);
+                    //
+                    string mailBodyFile = null;
+                    foreach (var tmpPath in new string[] { Path.Combine(InitialFolder, "temp"), destPath })
+                    {
+                        var mailFile = tmpPath != null ? Path.Combine(tmpPath, MailBodyFileName) : null;
+                        if (mailFile != null && File.Exists(mailFile))
+                        {
+                            mailBodyFile = mailFile;
+                        }
+                    }
                     SendErrorMail(new MimeMessage()
                     {
                         Subject = $"Archiwum {file}"
-                    });
+                    }, mailBodyFile);
+                    //
+                    MoveFileSafe(file, ErrorZIPFiles);
                 }
             }
         }
 
-        public static void GetAttachmentsFromZIPFile(string zipfile)
+        public static string GetAttachmentsFromZIPFile(string zipfile)
         {
             Logger.Debug($"Extracting file: {zipfile}");
-            string path = $"{InitialFolder}\\temp";
+            string path = Path.Combine(InitialFolder, "temp");
             if (!Directory.Exists(path))
             {
                 Logger.Debug($"Creating temp directory: {path}");
@@ -198,41 +218,52 @@ namespace PGNiG_FileProcessor
                     File.Delete(item);
                 }
             }
-            ZipFile.ExtractToDirectory(zipfile, path);
+            using (var archive = ZipFile.Open(zipfile, ZipArchiveMode.Read))
+            {
+                archive.ExtractToDirectory(path);
+            }
             string[] files = Directory.GetFiles(path, "*.msg");
             if (files.Length <= 0)
             {
                 throw new Exception($"Couldn't find msg file in directory: {path}");
             }
             string msgFile = files.First();
-            Storage.Message messagefile = new Storage.Message(msgFile, FileAccess.ReadWrite);
-            string date = messagefile.Headers.DateSent.ToLocalTime().ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
-            CreateMailBodyPDFFile(messagefile.BodyText, path);
-            messagefile.Dispose();
+            Logger.Debug($"Found mail message file: {msgFile}");
+            string date;
+            using (Storage.Message messagefile = new Storage.Message(msgFile, FileAccess.ReadWrite))
+            {
+                date = messagefile.Headers.DateSent.ToLocalTime().ToString(dateFormat);
+                Logger.Debug($"Fetched date: {date}");
+                CreateMailBodyPDFFile(messagefile.BodyText, path);
+            }
+            Logger.Debug($"Removing message file: {msgFile}");
             File.Delete(msgFile);
-            MoveFolderForClassification(path, InputClassificationFolder, date);
+            var destPath = Path.Combine(InputClassificationFolder, date);
+            MoveFolderForClassification(path, ref destPath);
+            return destPath;
         }
 
-        public static void MoveFolderForClassification(string inputFolder, string outputFolder, string date)
+        public static void MoveFolderForClassification(string inputFolder, ref string outputFolder)
         {
-            Directory.Move(inputFolder, $"{outputFolder}\\{date}");
-            ConvertOfficeFiles($"{outputFolder}\\{date}");
-            CreateSignalFile($"{outputFolder}\\{date}");
+            outputFolder = MoveDirectorySafe(inputFolder, outputFolder);
+            ConvertOfficeFiles(outputFolder);
+            CreateSignalFile(outputFolder);
         }
 
         public static void CreateSignalFile(string path)
         {
-            using (FileStream fs = File.Create(path + "\\SignalFile.xml"))
+            Logger.Debug($"Creating singal file in: {path}");
+            using (FileStream fs = File.Create(Path.Combine(path, SignalFileName)))
             {
                 byte[] author = new UTF8Encoding(true).GetBytes("1");
                 fs.Write(author, 0, author.Length);
             }
-
         }
 
         public static string CreateMailBodyPDFFile(string message, string path)
         {
-            string file = path + "\\MailBody.pdf";
+            string file = Path.Combine(path, MailBodyFileName);
+            Logger.Debug($"Generating mail body file: {file}");
             string MailBody = message;
             PdfDocument pdf = new PdfDocument();
             PdfPageBase page = pdf.Pages.Add();
@@ -311,14 +342,15 @@ namespace PGNiG_FileProcessor
                         Logger.Debug($"Processing mail with UID: {item.UniqueId}");
                         var message = subfolder.GetMessage(item.UniqueId);
                         string mailPDF = null;
-                        string date = message.Date.DateTime.ToString("yyyy'-'MM'-'dd'T'HH'-'mm'-'ss");
-                        string path = $"{InitialFolder}\\{date}";
+                        string date = message.Date.DateTime.ToString(dateFormat);
+                        string path = Path.Combine(InitialFolder, date);
                         try
                         {
                             Directory.CreateDirectory(path);
                             mailPDF = CreateMailBodyPDFFile(message.Date.ToLocalTime() + Environment.NewLine + message.Subject + Environment.NewLine + message.TextBody, path);
                             GetAttachments(message, path);
-                            MoveFolderForClassification(path, InputClassificationFolder, date);
+                            var destPath = Path.Combine(InputClassificationFolder, date);
+                            MoveFolderForClassification(path, ref destPath);
                         }
                         catch (Exception msgEx)
                         {
@@ -346,6 +378,11 @@ namespace PGNiG_FileProcessor
 
         public static void SendErrorMail(MimeMessage originalMessage, string mailPDF = null)
         {
+            if (!SendErrors)
+            {
+                Logger.Debug($"Sending errors is disabled. {originalMessage.Subject}");
+                return;
+            }
             using (var client = new SmtpClient(new ProtocolLogger(smtpLog)))
             {
                 MyWebClient webClient = new MyWebClient();
@@ -489,6 +526,7 @@ namespace PGNiG_FileProcessor
             foreach (string bid in invoices.Keys)
             {
                 foreach (string file in invoices[bid])
+                {
                     try
                     {
                         var files = attachments.ContainsKey(bid) ? new List<string>(attachments[bid]) : new List<string>();
@@ -500,8 +538,9 @@ namespace PGNiG_FileProcessor
                     {
                         Logger.Error(ex);
                     }
+                }
             }
-            CleanupOutputClassificationFolder(toRemove.ToArray());
+            CleanupOutputClassificationFolder(toRemove.Distinct().ToArray());
         }
 
         public static void CleanupOutputClassificationFolder(string[] PDFs)
@@ -516,6 +555,7 @@ namespace PGNiG_FileProcessor
         public static void MergePDF(string FV, List<string> Attachments)
         {
             Logger.Debug($"Merging files for: {FV}");
+            Logger.Debug($"Files to merge: {Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", Attachments)}");
             PdfDocumentBase mergedPDF = PdfDocument.MergeFiles(Attachments.ToArray());
             string filename = Path.GetFileName(FV);
             var file = Path.Combine(TmpCompleteFVs, filename);
@@ -596,5 +636,39 @@ namespace PGNiG_FileProcessor
             return -1;
         }
 
+        public static string MoveFileSafe(string file, string destPath)
+        {
+            string destFile;
+            var time = (int)DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
+            do
+            {
+                destFile = Path.Combine(destPath, Path.GetFileNameWithoutExtension(file) + $"-{time++}{Path.GetExtension(file)}");
+            }
+            while (File.Exists(destFile));
+            Logger.Debug($"Safe moving file: {file} -> {destFile}");
+            File.Move(file, destFile);
+            if (!File.Exists(destFile))
+            {
+                throw new Exception("Safe move file failed!");
+            }
+            return destFile;
+        }
+
+        public static string MoveDirectorySafe(string inputFolder, string outputFolder)
+        {
+            var n = 0;
+            string tmpOutputFolder;
+            do
+            {
+                tmpOutputFolder = $"{outputFolder}-{n++:D5}";
+            } while (Directory.Exists(tmpOutputFolder));
+            Logger.Debug($"Safe moving directory: {inputFolder} -> {tmpOutputFolder}");
+            Directory.Move(inputFolder, tmpOutputFolder);
+            if (!Directory.Exists(tmpOutputFolder))
+            {
+                throw new Exception("Safe move directory failed!");
+            }
+            return tmpOutputFolder;
+        }
     }
 }

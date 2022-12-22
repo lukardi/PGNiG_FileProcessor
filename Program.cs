@@ -16,6 +16,7 @@ namespace PGNiG_FileProcessor
             Spire.License.LicenseProvider.SetLicenseFileFullPath(ConfigurationManager.AppSettings.Get("SpireLicenseFilepath"));
             Logger.Init();
             FileGatherer.Init();
+            //
             if (Environment.UserInteractive)
             {
                 Logger.console = true;
